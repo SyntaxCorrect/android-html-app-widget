@@ -1,4 +1,4 @@
-#Fri Apr 05 13:14:45 CEST 2019
+#Fri Apr 05 13:47:43 CEST 2019
 base.0=C\:\\Disks\\E\\development.2016\\code\\github\\android-html-app-widget\\starting-code\\app\\build\\intermediates\\transforms\\dexMerger\\debug\\9
 path.0=classes.dex
 renamed.0=classes.dex
