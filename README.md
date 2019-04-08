@@ -1,32 +1,16 @@
-AppWidgetSample (Solution Code)
-===============================
+How to Build an Android App Widget With Web Technologies (Code for the Article)
+====================================================================
 
-AppWidgetSample demonstrates how to create and use Android app widgets, 
-including how to handle widget update requests and how to include button 
-actions in a widget.
+This is the repository for the code presented in the article:
 
-The main activity for this app is empty; all the functionality is in 
-the widget.
-
-Pre-requisites
---------------
-
-For this app you should be familiar with:
-* Creating, building, and running apps in Android Studio.
-* Sending and receiving broadcast intents.
-* Building and sending pending intents.
-
-
-Getting Started
----------------
-
-1. Download and open this sample in Android Studio.
+[How to Build an Android App Widget With Web Technologies...](https://syntaxcorrect.com/Java/How-to-Build-an-Android-App-Widget-With-Web-Technologies-Like-HTML-CSS-JS-Without-Cordova-or-PhoneGap-or-Any-Other-External-Framework-At-All)
 
 
 License
 -------
 
 Copyright 2017 Google, Inc.
+Modifications Copyright 2019 Melely S.r.l.
 
 Licensed to the Apache Software Foundation (ASF) under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
