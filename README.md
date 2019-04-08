@@ -10,6 +10,7 @@ License
 -------
 
 Copyright 2017 Google, Inc.
+
 Modifications Copyright 2019 Melely S.r.l.
 
 Licensed to the Apache Software Foundation (ASF) under one or more contributor
