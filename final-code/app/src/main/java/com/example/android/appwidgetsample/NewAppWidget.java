@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 Google Inc.
+ * Modifications Copyright 2019 Melely S.r.l.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +17,22 @@
 package com.example.android.appwidgetsample;
 
 import android.app.PendingIntent;
+import android.app.PendingIntent.CanceledException;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.os.Bundle;
+import android.os.Handler;
+import android.util.Base64;
+import android.util.SparseArray;
+import android.webkit.WebView;
 import android.widget.RemoteViews;
 
 import java.text.DateFormat;
@@ -30,86 +42,153 @@ import java.util.Date;
  * App widget provider class, to handle update broadcast intents and updates
  * for the app widget.
  */
-public class NewAppWidget extends AppWidgetProvider {
+public class NewAppWidget extends AppWidgetProvider
+{
+ private static SparseArray<WebView> cachedWebViews=null;
 
-    // Name of shared preferences file & key
-    private static final String SHARED_PREF_FILE =
-            "com.example.android.appwidgetsample";
-    private static final String COUNT_KEY = "count";
 
-    /**
-     * Update a single app widget.  This is a helper method for the standard
-     * onUpdate() callback that handles one widget update at a time.
-     *
-     * @param context          The application context.
-     * @param appWidgetManager The app widget manager.
-     * @param appWidgetId      The current app widget id.
-     */
-    private void updateAppWidget(Context context,
-                                AppWidgetManager appWidgetManager,
-                                int appWidgetId) {
+ // Name of shared preferences file & key
+ private static final String SHARED_PREF_FILE=
+  "com.example.android.appwidgetsample";
+ private static final String COUNT_KEY="count";
 
-        // Get the count from prefs.
-        SharedPreferences prefs =
-                context.getSharedPreferences(SHARED_PREF_FILE, 0);
-        int count = prefs.getInt(COUNT_KEY + appWidgetId, 0);
-        count++;
+ /**
+  * Update a single app widget.  This is a helper method for the standard
+  * onUpdate() callback that handles one widget update at a time.
+  *
+  * @param context          The application context.
+  * @param appWidgetManager The app widget manager.
+  * @param appWidgetId      The current app widget id.
+  */
+ private void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId)
+ {
+  RemoteViews views=new RemoteViews(context.getPackageName(), R.layout.new_app_widget);
 
-        // Get the current time.
-        String dateString =
-                DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date());
+  Bitmap canvasBitmap=null;
+  Canvas canvas=null;
+  Paint paint=null;
 
-        // Construct the RemoteViews object.
-        RemoteViews views = new RemoteViews(context.getPackageName(),
-                R.layout.new_app_widget);
-        views.setTextViewText(R.id.appwidget_id,
-                String.valueOf(appWidgetId));
-        views.setTextViewText(R.id.appwidget_update,
-                context.getResources().getString(
-                    R.string.date_count_format, count, dateString));
+  Bundle options=appWidgetManager.getAppWidgetOptions(appWidgetId);
+  Sizes newSizes=new Sizes(options);
 
-        // Save count back to prefs.
-        SharedPreferences.Editor prefEditor = prefs.edit();
-        prefEditor.putInt(COUNT_KEY + appWidgetId, count);
-        prefEditor.apply();
+  canvasBitmap=Bitmap.createBitmap(newSizes.minWidth, newSizes.maxHeight, Bitmap.Config.ARGB_8888);
 
-        // Setup update button to send an update request as a pending intent.
-        Intent intentUpdate = new Intent(context, NewAppWidget.class);
+  canvas=new Canvas(canvasBitmap);
 
-        // The intent action must be an app widget update.
-        intentUpdate.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+  paint=new Paint();
+  paint.setAntiAlias(true);
 
-        // Include the widget ID to be updated as an intent extra.
-        int[] idArray = new int[]{appWidgetId};
-        intentUpdate.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, idArray);
+  canvas.drawColor(0, PorterDuff.Mode.CLEAR);
 
-        // Wrap it all in a pending intent to send a broadcast.
-        // Use the app widget ID as the request code (third argument) so that
-        // each intent is unique.
-        PendingIntent pendingUpdate = PendingIntent.getBroadcast(context,
-                appWidgetId, intentUpdate, PendingIntent.FLAG_UPDATE_CURRENT);
 
-        // Assign the pending intent to the button onClick handler
-        views.setOnClickPendingIntent(R.id.button_update, pendingUpdate);
+  WebView webView=prepareWebView(context, appWidgetManager, appWidgetId);
+  webView.layout(0, 0, newSizes.minWidth, newSizes.maxHeight);
 
-        // Instruct the widget manager to update the widget.
-        appWidgetManager.updateAppWidget(appWidgetId, views);
+  int contentHeight=webView.getContentHeight();
+
+  if (contentHeight==0)
+  {
+   // we need to wait!
+
+   Intent intentUpdate=new Intent(context, NewAppWidget.class);
+
+   // The intent action must be an app widget update.
+   intentUpdate.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+
+   // Include the widget ID to be updated as an intent extra.
+   int[] idArray=new int[]{appWidgetId};
+   intentUpdate.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, idArray);
+
+   final PendingIntent pendingUpdate=PendingIntent.getBroadcast(context, appWidgetId, intentUpdate, PendingIntent.FLAG_UPDATE_CURRENT);
+
+   // We could use an Alarm but Handlers are way more precise for sub-second schedulings
+   Handler handler=new Handler();
+   handler.postDelayed(new Runnable()
+   {
+    public void run()
+    {
+     try
+     {
+      pendingUpdate.send();
+     }
+     catch (CanceledException e)
+     {
+      e.printStackTrace();
+     }
     }
+   }, 2000);
+   //}, 300);
 
-    /**
-     * Override for onUpdate() method, to handle all widget update requests.
-     *
-     * @param context          The application context.
-     * @param appWidgetManager The app widget manager.
-     * @param appWidgetIds     An array of the app widget IDs.
-     */
-    @Override
-    public void onUpdate(Context context, AppWidgetManager appWidgetManager,
-                         int[] appWidgetIds) {
-        // There may be multiple widgets active, so update all of them.
-        for (int appWidgetId : appWidgetIds) {
-            updateAppWidget(context, appWidgetManager, appWidgetId);
-        }
-    }
+   // return instead of drawing
+   return;
+  }
+
+  webView.draw(canvas);
+
+  views.setImageViewBitmap(R.id.draw, canvasBitmap);
+
+  appWidgetManager.updateAppWidget(appWidgetId, views);
+ }
+
+
+ private WebView prepareWebView(Context context, AppWidgetManager appWidgetManager, int appWidgetId)
+ {
+  if (cachedWebViews==null) { cachedWebViews=new SparseArray<>(); }
+  WebView webView=cachedWebViews.get(appWidgetId);
+
+  if (webView==null)
+  {
+   webView=new WebView(context);
+   cachedWebViews.put(appWidgetId, webView);
+
+   webView.setBackgroundColor(Color.TRANSPARENT);
+
+//   String unencodedHtml="<!DOCTYPE html><html><body>Hello World in HTML!</body></html>";
+
+   String unencodedHtml="<!DOCTYPE html>\n"+
+    "<html>\n"+
+    " <body>\n"+
+    "  <a class=\"weatherwidget-io\" href=\"https://forecast7.com/en/40d71n74d01/new-york/\" data-label_1=\"NEW YORK\" data-label_2=\"WEATHER\" data-theme=\"original\" >NEW YORK WEATHER</a>\n"+
+    "  <script>\n"+
+    "!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src='https://weatherwidget.io/js/widget.min.js';fjs.parentNode.insertBefore(js,fjs);}}(document,'script','weatherwidget-io-js');\n"+
+    "  </script>\n"+
+    " </body>\n"+
+    "</html>\n";
+
+
+   String encodedHtml=Base64.encodeToString(unencodedHtml.getBytes(), Base64.DEFAULT);
+   webView.loadData(encodedHtml, "text/html", "base64");
+
+   webView.setDrawingCacheEnabled(true);
+   webView.buildDrawingCache();
+   webView.getSettings().setJavaScriptEnabled(true);
+  }
+
+  return webView;
+ }
+
+
+
+
+
+
+
+ /**
+  * Override for onUpdate() method, to handle all widget update requests.
+  *
+  * @param context          The application context.
+  * @param appWidgetManager The app widget manager.
+  * @param appWidgetIds     An array of the app widget IDs.
+  */
+ @Override
+ public void onUpdate(Context context, AppWidgetManager appWidgetManager,
+                      int[] appWidgetIds)
+ {
+  // There may be multiple widgets active, so update all of them.
+  for (int appWidgetId : appWidgetIds)
+  {
+   updateAppWidget(context, appWidgetManager, appWidgetId);
+  }
+ }
 }
 
